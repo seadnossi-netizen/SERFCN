@@ -1,4 +1,5 @@
 #import "menu.h"
+#import "FloatingSwitch.h"
 
 #pragma mark - Helpers
 
@@ -761,70 +762,16 @@ static UIColor *RGBA(CGFloat r, CGFloat g, CGFloat b, CGFloat a) {
 
 #pragma mark Show / Dismiss
 
-- (UIWindow *)_findTopWindow {
-    UIWindow *top = nil;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    top = [UIApplication sharedApplication].keyWindow;
-#pragma clang diagnostic pop
-    if (!top) {
-        if (@available(iOS 13.0, *)) {
-            for (UIScene *s in UIApplication.sharedApplication.connectedScenes) {
-                if ([s isKindOfClass:[UIWindowScene class]] &&
-                    s.activationState == UISceneActivationStateForegroundActive) {
-                    for (UIWindow *w in ((UIWindowScene *)s).windows) {
-                        if (!w.isHidden && w.alpha > 0 &&
-                            [w isKindOfClass:NSClassFromString(@"FloatingSwitch")] == NO) {
-                            if (top == nil || w.windowLevel > top.windowLevel) top = w;
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-    }
-    return top;
-}
-
 - (void)showMenuAnimated:(BOOL)animated {
-    UIWindow *hostWindow = [self _findTopWindow];
-    if (!hostWindow) return;
-
-    // Add our view directly to the host window — no new UIWindow needed
-    // This avoids all touch-routing conflicts with FloatingSwitch overlay
-    if (self.view.superview == nil) {
-        self.view.frame = hostWindow.bounds;
-        self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        [hostWindow addSubview:self.view];
-
-        // Center panel now that we have real bounds
-        CGFloat panelW = _panelView.bounds.size.width;
-        CGFloat panelH = _panelView.bounds.size.height;
-        _panelView.frame = CGRectMake(
-            (hostWindow.bounds.size.width  - panelW) / 2.0,
-            (hostWindow.bounds.size.height - panelH) / 2.0,
-            panelW, panelH);
-        [self repositionCloseButton];
-    }
-
-    if (animated) {
-        self.view.alpha = 0;
-        [UIView animateWithDuration:0.18 animations:^{ self.view.alpha = 1; }];
-    } else {
-        self.view.alpha = 1;
-    }
+    FloatingSwitch *fs = [FloatingSwitch shared];
+    if (!fs || self.view.superview) return;
+    (void)self.view;  // trigger viewDidLoad so panel is ready
+    [fs presentMenuViewController:self animated:animated];
 }
 
 - (void)dismissMenuAnimated:(BOOL)animated {
-    void (^teardown)(void) = ^{
-        [self.view removeFromSuperview];
-    };
-    if (animated) {
-        [UIView animateWithDuration:0.18 animations:^{ self.view.alpha = 0; }
-                         completion:^(BOOL f){ teardown(); }];
-    } else {
-        teardown();
-    }
+    [[FloatingSwitch shared] dismissPresentedMenuViewControllerAnimated:animated
+                                                            completion:nil];
 }
 
 - (void)closeTapped { [self dismissMenuAnimated:YES]; }
