@@ -13,11 +13,8 @@ SERFCN_FRAMEWORKS = UIKit Foundation
 
 SERFCN_CFLAGS = -fobjc-arc
 
-# -undefined dynamic_lookup: linker won't error on hidden ObjC symbols in APIKey.dylib.
-# The dylib is still linked so dyld loads it; APIClient class resolves at runtime via ObjC runtime.
-SERFCN_LDFLAGS = -undefined dynamic_lookup \
-                 $(THEOS_PROJECT_DIR)/API/APIKey.dylib \
-                 -Wl,-rpath,/var/jb/usr/lib \
-                 -lc++ -lc++abi
+# APIKey.dylib is loaded at runtime via dlopen — no link-time dependency.
+# It is bundled into the .deb via layout/var/jb/usr/lib/APIKey.dylib.
+SERFCN_LDFLAGS = -lc++ -lc++abi
 
 include $(THEOS_MAKE_PATH)/tweak.mk
