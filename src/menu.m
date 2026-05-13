@@ -767,7 +767,17 @@ static UIColor *RGBA(CGFloat r, CGFloat g, CGFloat b, CGFloat a) {
                 }
             }
         }
-        _overlayWindow = [[UIWindow alloc] initWithFrame:keyWindow.bounds];
+        if (@available(iOS 13.0, *)) {
+            UIWindowScene *ws = (UIWindowScene *)keyWindow.windowScene;
+            if (ws) {
+                _overlayWindow = [[UIWindow alloc] initWithWindowScene:ws];
+            } else {
+                _overlayWindow = [[UIWindow alloc] initWithFrame:keyWindow.bounds];
+            }
+        } else {
+            _overlayWindow = [[UIWindow alloc] initWithFrame:keyWindow.bounds];
+        }
+        _overlayWindow.frame = keyWindow.bounds;
         _overlayWindow.backgroundColor = [UIColor clearColor];
         _overlayWindow.windowLevel     = UIWindowLevelAlert + 100;
         _overlayWindow.rootViewController = self;
