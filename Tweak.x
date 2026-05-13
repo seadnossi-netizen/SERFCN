@@ -1,9 +1,7 @@
 #import "src/menu.h"
 #import "src/FloatingSwitch.h"
-#import "API/APIClient.h"
 
 static MenuViewController *_menuVC = nil;
-static BOOL _menuVisible = NO;
 
 static void toggleMenu(BOOL show) {
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -11,36 +9,20 @@ static void toggleMenu(BOOL show) {
             if (!_menuVC) {
                 _menuVC = [[MenuViewController alloc] init];
             }
-            _menuVisible = YES;
             [_menuVC showMenuAnimated:YES];
         } else {
-            _menuVisible = NO;
             [_menuVC dismissMenuAnimated:YES];
         }
     });
 }
 
-static void setupFloatingButton(void) {
-    dispatch_async(dispatch_get_main_queue(), ^{
+%ctor {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
         FloatingSwitch *fs = [FloatingSwitch shared];
         fs.onToggle = ^(BOOL isOn) {
             toggleMenu(isOn);
         };
         [fs show];
-    });
-}
-
-%ctor {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-
-        apiclient_set_token("YkSXOtvqlVQy/9oPcI7bv8KzcPGuWbBAJo4zPV8oSeyNi0nwolEDstMEOrlEsxHyiUUj4M/7hRwYD6VApIf9c3kkgQYy6dWE/B69+eT5F0g=");
-        apiclient_set_language("en");
-        apiclient_hide_ui(true);
-        apiclient_silent_mode(true);
-
-        apiclient_paid(^{
-            setupFloatingButton();
-        });
     });
 }
