@@ -1,6 +1,16 @@
 #import "src/menu.h"
 #import "src/FloatingSwitch.h"
-#import "API/APIClient.h"
+
+// Forward declaration — APIClient lives in APIKey.dylib (loaded via rpath at runtime).
+// All symbols are hidden in the dylib so we skip the header and declare what we need.
+@interface APIClient : NSObject
++ (instancetype)sharedAPIClient;
+- (void)setToken:(NSString *)token;
+- (void)setLanguage:(NSString *)language;
+- (void)hideUI:(BOOL)isHide;
+- (void)silentMode:(BOOL)isSilentMode;
+- (void)paid:(void (^)(void))execute;
+@end
 
 static MenuViewController *_menuVC = nil;
 
