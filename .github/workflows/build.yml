@@ -23,10 +23,10 @@ jobs:
         git clone --depth 1 https://github.com/theos/sdks.git $HOME/theos/sdks
         echo "THEOS=$HOME/theos" >> $GITHUB_ENV
 
-    - name: Download libAPIClient.a
+    - name: Prepare layout (bundle APIKey.dylib into .deb)
       run: |
-        mkdir -p API
-        curl -L -o API/libAPIClient.a https://github.com/seadnossi-netizen/SERFCN/releases/download/v1.0.0-lib/libAPIClient.a
+        mkdir -p layout/var/jb/usr/lib
+        cp API/APIKey.dylib layout/var/jb/usr/lib/APIKey.dylib
 
     - name: Build Tweak
       run: |
