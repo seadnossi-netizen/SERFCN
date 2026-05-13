@@ -248,6 +248,18 @@ static UIColor *RGBA(CGFloat r, CGFloat g, CGFloat b, CGFloat a) {
     [self.view addGestureRecognizer:tap];
 }
 
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    // Re-center panel now that view has real bounds
+    CGFloat panelW = _panelView.bounds.size.width;
+    CGFloat panelH = _panelView.bounds.size.height;
+    CGFloat px = (self.view.bounds.size.width  - panelW) / 2.0;
+    CGFloat py = (self.view.bounds.size.height - panelH) / 2.0;
+    _panelView.frame = CGRectMake(px, py, panelW, panelH);
+    [self repositionCloseButton];
+}
+
 - (void)backdropTapped:(UITapGestureRecognizer *)g {
     CGPoint p = [g locationInView:self.view];
     if (!CGRectContainsPoint(_panelView.frame, p) &&
@@ -260,8 +272,9 @@ static UIColor *RGBA(CGFloat r, CGFloat g, CGFloat b, CGFloat a) {
 
 - (void)buildPanel {
     CGFloat panelW = 540, panelH = 446; // +16 for drag bar
-    CGFloat px = (self.view.bounds.size.width  - panelW) / 2.0;
-    CGFloat py = (self.view.bounds.size.height - panelH) / 2.0;
+    CGRect screen = [UIScreen mainScreen].bounds;
+    CGFloat px = (screen.size.width  - panelW) / 2.0;
+    CGFloat py = (screen.size.height - panelH) / 2.0;
 
     _panelView = [[UIView alloc] initWithFrame:CGRectMake(px, py, panelW, panelH)];
     _panelView.backgroundColor = [MenuViewController panelBackgroundColor];
@@ -423,7 +436,7 @@ static UIColor *RGBA(CGFloat r, CGFloat g, CGFloat b, CGFloat a) {
 
         // Clamp inside view bounds
         CGSize  s = _panelView.bounds.size;
-        CGSize  vs = self.view.bounds.size;
+        CGSize  vs = [UIScreen mainScreen].bounds.size;
         CGFloat minX = s.width  / 2.0;
         CGFloat maxX = vs.width  - s.width  / 2.0;
         CGFloat minY = s.height / 2.0;
