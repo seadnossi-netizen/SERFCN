@@ -213,7 +213,6 @@ static UIColor *RGBA(CGFloat r, CGFloat g, CGFloat b, CGFloat a) {
     NSArray<NSString *> *_tabTitles;
     NSArray<NSString *> *_tabSymbols;
     CGPoint _dragStartCenter;
-    UIWindow *_overlayWindow;
 }
 
 + (UIColor *)panelBackgroundColor    { return RGB(26, 32, 48);  }
@@ -762,42 +761,50 @@ static UIColor *RGBA(CGFloat r, CGFloat g, CGFloat b, CGFloat a) {
 
 #pragma mark Show / Dismiss
 
-- (void)showMenuAnimated:(BOOL)animated {
-    if (!_overlayWindow) {
-        UIWindow *keyWindow = nil;
+- (UIWindow *)_findTopWindow {
+    UIWindow *top = nil;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        keyWindow = [UIApplication sharedApplication].keyWindow;
+    top = [UIApplication sharedApplication].keyWindow;
 #pragma clang diagnostic pop
-        if (!keyWindow) {
-            if (@available(iOS 13.0, *)) {
-                for (UIScene *s in UIApplication.sharedApplication.connectedScenes) {
-                    if ([s isKindOfClass:[UIWindowScene class]] && s.activationState == UISceneActivationStateForegroundActive) {
-                        UIWindowScene *ws = (UIWindowScene *)s;
-                        keyWindow = ws.windows.firstObject;
-                        break;
+    if (!top) {
+        if (@available(iOS 13.0, *)) {
+            for (UIScene *s in UIApplication.sharedApplication.connectedScenes) {
+                if ([s isKindOfClass:[UIWindowScene class]] &&
+                    s.activationState == UISceneActivationStateForegroundActive) {
+                    for (UIWindow *w in ((UIWindowScene *)s).windows) {
+                        if (!w.isHidden && w.alpha > 0 &&
+                            [w isKindOfClass:NSClassFromString(@"FloatingSwitch")] == NO) {
+                            if (top == nil || w.windowLevel > top.windowLevel) top = w;
+                        }
                     }
+                    break;
                 }
             }
         }
-        if (@available(iOS 13.0, *)) {
-            UIWindowScene *ws = (UIWindowScene *)keyWindow.windowScene;
-            if (ws) {
-                _overlayWindow = [[UIWindow alloc] initWithWindowScene:ws];
-            } else {
-                _overlayWindow = [[UIWindow alloc] initWithFrame:keyWindow.bounds];
-            }
-        } else {
-            _overlayWindow = [[UIWindow alloc] initWithFrame:keyWindow.bounds];
-        }
-        _overlayWindow.frame = keyWindow.bounds;
-        _overlayWindow.backgroundColor = [UIColor clearColor];
-        _overlayWindow.windowLevel     = UIWindowLevelAlert + 100;
-        _overlayWindow.rootViewController = self;
-        _overlayWindow.hidden = NO;
-        [_overlayWindow makeKeyAndVisible];
-    } else {
-        _overlayWindow.hidden = NO;
+    }
+    return top;
+}
+
+- (void)showMenuAnimated:(BOOL)animated {
+    UIWindow *hostWindow = [self _findTopWindow];
+    if (!hostWindow) return;
+
+    // Add our view directly to the host window — no new UIWindow needed
+    // This avoids all touch-routing conflicts with FloatingSwitch overlay
+    if (self.view.superview == nil) {
+        self.view.frame = hostWindow.bounds;
+        self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        [hostWindow addSubview:self.view];
+
+        // Center panel now that we have real bounds
+        CGFloat panelW = _panelView.bounds.size.width;
+        CGFloat panelH = _panelView.bounds.size.height;
+        _panelView.frame = CGRectMake(
+            (hostWindow.bounds.size.width  - panelW) / 2.0,
+            (hostWindow.bounds.size.height - panelH) / 2.0,
+            panelW, panelH);
+        [self repositionCloseButton];
     }
 
     if (animated) {
@@ -810,9 +817,7 @@ static UIColor *RGBA(CGFloat r, CGFloat g, CGFloat b, CGFloat a) {
 
 - (void)dismissMenuAnimated:(BOOL)animated {
     void (^teardown)(void) = ^{
-        self->_overlayWindow.hidden = YES;
-        self->_overlayWindow.rootViewController = nil;
-        self->_overlayWindow = nil;
+        [self.view removeFromSuperview];
     };
     if (animated) {
         [UIView animateWithDuration:0.18 animations:^{ self.view.alpha = 0; }
