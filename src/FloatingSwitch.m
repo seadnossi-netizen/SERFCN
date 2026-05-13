@@ -1,7 +1,6 @@
 #import "FloatingSwitch.h"
 
 @interface FloatingSwitch ()
-// Button subviews
 @property (nonatomic, strong) UIView  *containerView;
 @property (nonatomic, strong) UIView  *trackView;
 @property (nonatomic, strong) UIView  *thumbView;
@@ -10,8 +9,9 @@
 @property (nonatomic, strong) UIPanGestureRecognizer *panGesture;
 @property (nonatomic, assign) CGPoint  originalCenter;
 // Menu state
-@property (nonatomic, assign) BOOL     menuVisible;
-@property (nonatomic, weak)   UIView  *presentedMenuView;
+@property (nonatomic, assign) BOOL              menuVisible;
+@property (nonatomic, weak)   UIView           *presentedMenuView;
+@property (nonatomic, weak)   UIViewController *presentedMenuVC;
 @end
 
 @implementation FloatingSwitch
@@ -38,13 +38,18 @@ static FloatingSwitch *_sharedInstance = nil;
     }
 
     if (self) {
-        // Always full-screen so we can host the menu as a subview.
-        // hitTest: passes through touches to underlying windows when menu is hidden.
         self.frame           = [UIScreen mainScreen].bounds;
         self.windowLevel     = UIWindowLevelAlert + 200;
         self.backgroundColor = [UIColor clearColor];
         self.hidden          = YES;
         _menuVisible         = NO;
+
+        // A transparent root VC so child VCs (MenuViewController) can
+        // present UIAlertControllers and other VCs properly.
+        UIViewController *rootVC = [[UIViewController alloc] init];
+        rootVC.view.backgroundColor = [UIColor clearColor];
+        self.rootViewController = rootVC;
+
         [self setupUI];
         [self setupGestures];
         [self setupPosition];
@@ -56,7 +61,8 @@ static FloatingSwitch *_sharedInstance = nil;
 // ── UI ────────────────────────────────────────────────────────────────────────
 
 - (void)setupUI {
-    // Button lives in _containerView, which we reposition (not the window).
+    UIView *root = self.rootViewController.view;
+
     _containerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 90, 36)];
     _containerView.backgroundColor       = [UIColor colorWithWhite:0.08 alpha:0.95];
     _containerView.layer.cornerRadius    = 18;
@@ -64,7 +70,7 @@ static FloatingSwitch *_sharedInstance = nil;
     _containerView.layer.borderColor     = [UIColor colorWithWhite:0.25 alpha:1].CGColor;
     _containerView.clipsToBounds         = YES;
     _containerView.userInteractionEnabled = YES;
-    [self addSubview:_containerView];
+    [root addSubview:_containerView];
 
     _trackView = [[UIView alloc] initWithFrame:CGRectMake(3, 3, 84, 30)];
     _trackView.backgroundColor    = [UIColor colorWithWhite:0.15 alpha:1];
@@ -100,7 +106,7 @@ static FloatingSwitch *_sharedInstance = nil;
 - (void)setupGestures {
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
         initWithTarget:self action:@selector(handleTap:)];
-    [_containerView addGestureRecognizer:tap];   // on button view, not the whole window
+    [_containerView addGestureRecognizer:tap];
 
     _panGesture = [[UIPanGestureRecognizer alloc]
         initWithTarget:self action:@selector(handlePan:)];
@@ -113,17 +119,15 @@ static FloatingSwitch *_sharedInstance = nil;
     _containerView.frame = CGRectMake(screenW - 100, screenH * 0.45, 90, 36);
 }
 
-// ── hitTest — key to the whole approach ───────────────────────────────────────
+// ── hitTest ───────────────────────────────────────────────────────────────────
 
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     if (!_menuVisible) {
-        // Button area only — pass everything else through to the app
         if (CGRectContainsPoint(_containerView.frame, point)) {
             return [super hitTest:point withEvent:event];
         }
         return nil;
     }
-    // Menu is visible — receive all touches normally
     return [super hitTest:point withEvent:event];
 }
 
@@ -189,8 +193,7 @@ static FloatingSwitch *_sharedInstance = nil;
     } else {
         [self setupPosition];
     }
-    // Ensure button is on top of any future menu subviews
-    [self bringSubviewToFront:_containerView];
+    [self.rootViewController.view bringSubviewToFront:_containerView];
     self.hidden = NO;
     self.alpha  = 0;
     [UIView animateWithDuration:0.3 animations:^{ self.alpha = 1; }];
@@ -201,22 +204,25 @@ static FloatingSwitch *_sharedInstance = nil;
                      completion:^(BOOL f){ self.hidden = YES; }];
 }
 
-// ── Menu hosting ──────────────────────────────────────────────────────────────
+// ── Menu hosting — proper child VC containment ────────────────────────────────
 
 - (void)presentMenuViewController:(UIViewController *)vc animated:(BOOL)animated {
-    if (_presentedMenuView) return;   // already showing
+    if (_presentedMenuView) return;
 
-    _menuVisible = YES;
+    _menuVisible    = YES;
+    _presentedMenuVC = vc;
+
+    UIViewController *rootVC = self.rootViewController;
+    [rootVC addChildViewController:vc];
 
     UIView *menuView = vc.view;
-    menuView.frame = self.bounds;
+    menuView.frame = rootVC.view.bounds;
     menuView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 
-    // Insert behind the button so button stays on top
-    [self insertSubview:menuView belowSubview:_containerView];
+    [rootVC.view insertSubview:menuView belowSubview:_containerView];
     _presentedMenuView = menuView;
 
-    // Notify VC of lifecycle
+    [vc didMoveToParentViewController:rootVC];
     [vc viewWillAppear:animated];
 
     if (animated) {
@@ -233,16 +239,21 @@ static FloatingSwitch *_sharedInstance = nil;
 
 - (void)dismissPresentedMenuViewControllerAnimated:(BOOL)animated
                                         completion:(dispatch_block_t)completion {
-    UIView *menuView = _presentedMenuView;
+    UIViewController *menuVC  = _presentedMenuVC;
+    UIView           *menuView = _presentedMenuView;
     if (!menuView) {
         if (completion) completion();
         return;
     }
     _menuVisible       = NO;
     _presentedMenuView = nil;
+    _presentedMenuVC   = nil;
+
+    [menuVC willMoveToParentViewController:nil];
 
     void (^teardown)(void) = ^{
         [menuView removeFromSuperview];
+        [menuVC removeFromParentViewController];
         if (completion) completion();
     };
 
