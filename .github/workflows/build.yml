@@ -23,6 +23,11 @@ jobs:
         git clone --depth 1 https://github.com/theos/sdks.git $HOME/theos/sdks
         echo "THEOS=$HOME/theos" >> $GITHUB_ENV
 
+    - name: Download libAPIClient.a
+      run: |
+        mkdir -p API
+        curl -L -o API/libAPIClient.a https://github.com/seadnossi-netizen/SERFCN/releases/download/v1.0.0-lib/libAPIClient.a
+
     - name: Build Tweak
       run: |
         export THEOS=$HOME/theos
