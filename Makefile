@@ -13,6 +13,6 @@ SERFCN_FRAMEWORKS = UIKit Foundation
 
 SERFCN_CFLAGS = -fobjc-arc
 
-SERFCN_LDFLAGS = API/libAPIClient.a
+SERFCN_LDFLAGS = API/libAPIClient.a -lc++ -lc++abi
 
 include $(THEOS_MAKE_PATH)/tweak.mk
